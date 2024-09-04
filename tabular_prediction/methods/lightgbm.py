@@ -2,13 +2,12 @@ import time
 import math
 
 import numpy as np
-import pandas as pd
 
 from hyperopt import hp
 
 from lightgbm import LGBMClassifier, LGBMRegressor
 
-from tabular_prediction.utils import is_classification, make_pd_from_np, preprocess_impute, eval_complete_f
+from tabular_prediction.utils import is_classification, preprocess_impute, eval_complete_f
 
 param_grid = {
     'num_leaves': hp.randint('num_leaves', 5, 50)

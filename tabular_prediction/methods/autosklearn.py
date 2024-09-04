@@ -1,8 +1,5 @@
 import time
 
-import numpy as np
-import pandas as pd
-
 from autosklearn.classification import AutoSklearnClassifier
 from autosklearn.regression import AutoSklearnRegressor
 from autosklearn.metrics import accuracy, log_loss, balanced_accuracy, average_precision, mean_squared_error, mean_absolute_error, r2
