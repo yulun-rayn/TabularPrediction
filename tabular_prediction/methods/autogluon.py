@@ -32,7 +32,6 @@ def get_scoring_string(metric_used, multiclass=True):
     else:
         raise Exception('No scoring string found for metric')
 
-
 def autogluon_metric(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300):
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=False, impute=False, standardize=False, cat_features=cat_features)
