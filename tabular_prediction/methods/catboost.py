@@ -47,7 +47,7 @@ def catboost_metric(x, y, test_x, test_y, metric_used, cat_features=None, max_ti
     x = make_pd_from_np(x, cat_features=cat_features)
     test_x = make_pd_from_np(test_x, cat_features=cat_features)
 
-    def clf_(**params):
+    def model_(**params):
         if is_classification(metric_used):
             return CatBoostClassifier(
                 loss_function=get_scoring_string(metric_used),
@@ -70,6 +70,6 @@ def catboost_metric(x, y, test_x, test_y, metric_used, cat_features=None, max_ti
                 **params)
 
     start_time = time.time()
-    pred, _ = eval_complete_f(x, y, test_x, clf_, param_grid, metric_used, max_time, no_tune)
+    pred, _ = eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune)
     end_time = time.time()
     return test_y, pred, end_time-start_time

@@ -33,6 +33,10 @@ def preprocess_impute(x, y, test_x, test_y, impute, one_hot, standardize, cat_fe
     x, y, test_x, test_y = x.cpu().numpy(), y.cpu().long().numpy(), test_x.cpu().numpy(), test_y.cpu().long().numpy()
     cat_features = cat_features.tolist() if cat_features is not None else []
 
+    cat_features_min = np.concatenate((x, test_x), axis=0)[:, cat_features].min(0)
+    x[:, cat_features] = x[:, cat_features] - cat_features_min
+    test_x[:, cat_features] = test_x[:, cat_features] - cat_features_min
+
     if impute:
         imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean')
         imp_mean.fit(x)
@@ -73,20 +77,20 @@ def get_scoring_string(metric_used):
     else:
         raise Exception('No scoring string found for metric')
 
-def eval_f(params, clf_, x, y, metric_used):
-    scores = cross_val_score(clf_(**params), x, y, cv=CV, scoring=get_scoring_string(metric_used))
+def eval_f(params, model_, x, y, metric_used):
+    scores = cross_val_score(model_(**params), x, y, cv=CV, scoring=get_scoring_string(metric_used))
     return -np.nanmean(scores)
 
-def eval_complete_f(x, y, test_x, clf_, param_grid, metric_used, max_time, no_tune):
+def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune):
     start_time = time.time()
     def stop(trial):
         return time.time() - start_time > max_time, []
 
     if no_tune is None:
-        default = eval_f({}, clf_, x, y, metric_used)
+        default = eval_f({}, model_, x, y, metric_used)
         trials = Trials()
         best = fmin(
-            fn=lambda params: eval_f(params, clf_, x, y, metric_used),
+            fn=lambda params: eval_f(params, model_, x, y, metric_used),
             space=param_grid,
             algo=rand.suggest,
             rstate=np.random.default_rng(int(y[:].sum()) % 10000),
@@ -105,14 +109,14 @@ def eval_complete_f(x, y, test_x, clf_, param_grid, metric_used, max_time, no_tu
         best = no_tune.copy()
 
     start = time.time()
-    clf = clf_(**best)
-    clf.fit(x, y)
+    model = model_(**best)
+    model.fit(x, y)
     fit_time = time.time() - start
     start = time.time()
     if is_classification(metric_used):
-        pred = clf.predict_proba(test_x)
+        pred = model.predict_proba(test_x)
     else:
-        pred = clf.predict(test_x)
+        pred = model.predict(test_x)
     inference_time = time.time() - start
 
     best = {'best': best}
