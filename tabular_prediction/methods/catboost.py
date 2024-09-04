@@ -36,8 +36,9 @@ def catboost_metric(x, y, test_x, test_y, metric_used, cat_features=None, max_ti
         one_hot=False, impute=False, standardize=False, cat_features=cat_features)
 
     # Nans in categorical features must be encoded as separate class
-    x[:, cat_features], test_x[:, cat_features] = np.nan_to_num(x[:, cat_features], -1), np.nan_to_num(
-        test_x[:, cat_features], -1)
+    x[:, cat_features], test_x[:, cat_features] = (
+        np.nan_to_num(x[:, cat_features], -1), np.nan_to_num(test_x[:, cat_features], -1)
+    )
 
     if gpu_id is not None:
         gpu_params = {'task_type':"GPU", 'devices':gpu_id}

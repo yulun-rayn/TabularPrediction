@@ -33,10 +33,6 @@ def preprocess_impute(x, y, test_x, test_y, impute, one_hot, standardize, cat_fe
     x, y, test_x, test_y = x.cpu().numpy(), y.cpu().long().numpy(), test_x.cpu().numpy(), test_y.cpu().long().numpy()
     cat_features = cat_features.tolist() if cat_features is not None else []
 
-    cat_features_min = np.concatenate((x, test_x), axis=0)[:, cat_features].min(0)
-    x[:, cat_features] = x[:, cat_features] - cat_features_min
-    test_x[:, cat_features] = test_x[:, cat_features] - cat_features_min
-
     if impute:
         imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean')
         imp_mean.fit(x)
