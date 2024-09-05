@@ -30,7 +30,7 @@ def get_scoring_string(metric_used):
     else:
         raise Exception('No scoring string found for metric')
 
-def catboost_metric(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None, gpu_id=None):
+def catboost_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None, gpu_id=None):
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=False, impute=False, standardize=False, cat_features=cat_features)
 

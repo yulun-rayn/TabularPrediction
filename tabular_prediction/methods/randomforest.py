@@ -15,7 +15,7 @@ param_grid = {
     'min_samples_split': hp.choice('min_samples_split', [5, 10])
 }
 
-def randomforest_metric(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None):
+def randomforest_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None):
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=False, impute=True, standardize=False, cat_features=cat_features)
 

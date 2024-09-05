@@ -7,7 +7,7 @@ from hyperopt import hp
 
 from xgboost import XGBClassifier, XGBRegressor
 
-from tabular_prediction.utils import is_classification, make_pd_from_np, preprocess_impute, eval_complete_f
+from tabular_prediction.utils import is_classification, preprocess_impute, eval_complete_f
 
 MULTITHREAD = -1
 
@@ -27,19 +27,17 @@ param_grid = {
 def get_scoring_string(metric_used, multiclass=True):
     if metric_used.__name__ == "cross_entropy_metric":
         if multiclass:
-            return 'mlogloss'
+            return 'multi:softmax'
         else:
-            return 'logloss'
-    elif metric_used.__name__ == "auc_metric":
-        return 'auc'
-    elif metric_used.__name__ == "rmse_metric":
-        return 'rmse'
+            return 'binary:logitraw'
+    elif metric_used.__name__ == "mse_metric":
+        return 'reg:squarederror'
     elif metric_used.__name__ == "mae_metric":
-        return 'mae'
+        return 'reg:absoluteerror'
     else:
         raise Exception('No scoring string found for metric')
 
-def xgboost_metric(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None, gpu_id=None):
+def xgboost_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None, gpu_id=None):
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=False, impute=False, standardize=False, cat_features=cat_features)
 
@@ -51,14 +49,14 @@ def xgboost_metric(x, y, test_x, test_y, metric_used, cat_features=None, max_tim
     def model_(**params):
         if is_classification(metric_used):
             return XGBClassifier(
-                eval_metric=get_scoring_string(metric_used, multiclass=(len(np.unique(y)) > 2)),
+                objective=get_scoring_string(metric_used, multiclass=(len(np.unique(y)) > 2)),
                 use_label_encoder=False,
                 nthread=MULTITHREAD,
                 **params,
                 **gpu_params)
         else:
             return XGBRegressor(
-                eval_metric=get_scoring_string(metric_used, multiclass=(len(np.unique(y)) > 2)),
+                objective=get_scoring_string(metric_used, multiclass=(len(np.unique(y)) > 2)),
                 use_label_encoder=False,
                 nthread=MULTITHREAD,
                 **params,

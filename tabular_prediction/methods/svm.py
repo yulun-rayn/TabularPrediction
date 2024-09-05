@@ -12,7 +12,7 @@ param_grid = {
     'kernel': hp.choice('kernel', ['rbf', 'poly', 'sigmoid'])
 }
 
-def svm_metric(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None):
+def svm_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None):
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=True, impute=True, standardize=True, cat_features=cat_features)
 

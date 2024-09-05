@@ -1,4 +1,5 @@
 # My additions
+.vscode
 *.pt
 *.csv
 **/AutogluonModels/

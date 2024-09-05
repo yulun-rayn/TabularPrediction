@@ -1,5 +1,5 @@
 # TabularPrediction
-A repository hosting popular tabular prediction baselines.
+A repository hosting popular tabular prediction methods. Tuning is automatically performed for each method.
 
 
 ## Installation
