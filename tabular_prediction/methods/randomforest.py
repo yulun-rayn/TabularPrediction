@@ -1,7 +1,4 @@
 import time
-import math
-
-import numpy as np
 
 from hyperopt import hp
 
