@@ -29,4 +29,4 @@ Prediction on custom datasets can be performed with the following function call.
 )
 ```
 
-`x_train`, `y_train`, `x_test`, `y_test` are the data (loaded as torch tensors); `cat_features` is a list of indices indicating which columns of `x` are categorical; `metric_used` is the evaluation function to be used as the objective; `max_time` is the time budget (in seconds).
+`x_train`, `y_train`, `x_test`, `y_test` are the data (loaded as torch tensors); `cat_features` is a list of categorical feature indices (indicating which columns of `x` are categorical); `metric_used` is the evaluation metric (function) for model selection; `max_time` is the time budget (in seconds).
