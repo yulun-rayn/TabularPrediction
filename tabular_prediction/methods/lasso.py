@@ -3,7 +3,7 @@ import math
 
 from hyperopt import hp
 
-from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.linear_model import LogisticRegression, Lasso
 
 from tabular_prediction.utils import is_classification, preprocess_impute, eval_complete_f
 
@@ -20,7 +20,7 @@ param_grid_reg = {
     'alpha': hp.loguniform('alpha', math.log(1e-6), math.log(1e1))
 }
 
-def ridge_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None):
+def lasso_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None):
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=True, impute=True, standardize=True, cat_features=cat_features)
 
@@ -31,9 +31,9 @@ def ridge_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time
 
     def model_(**params):
         if is_classification(metric_used):
-            return LogisticRegression(penalty='l2', solver='saga', tol=1e-4, n_jobs=MULTITHREAD, **params)
+            return LogisticRegression(penalty='l1', solver='saga', tol=1e-4, n_jobs=MULTITHREAD, **params)
         else:
-            return Ridge(tol=1e-4, **params)
+            return Lasso(tol=1e-4, **params)
 
     start_time = time.time()
     pred, _ = eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune)
