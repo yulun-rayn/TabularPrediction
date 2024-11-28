@@ -63,6 +63,6 @@ def xgboost_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_ti
                 **gpu_params)
 
     start_time = time.time()
-    pred, _ = eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune)
+    summary = eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune)
     end_time = time.time()
-    return test_y, pred, end_time-start_time
+    return test_y, summary, end_time-start_time

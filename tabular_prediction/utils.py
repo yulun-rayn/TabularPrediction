@@ -78,45 +78,61 @@ def eval_f(params, model_, x, y, metric_used):
     return -np.nanmean(scores)
 
 def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune):
-    start_time = time.time()
-    def stop(trial):
-        return time.time() - start_time > max_time, []
+    if not isinstance(max_time, list):
+        max_time = [max_time]
 
     if no_tune is None:
         default = eval_f({}, model_, x, y, metric_used)
+        summary = {}
         trials = Trials()
-        best = fmin(
-            fn=lambda params: eval_f(params, model_, x, y, metric_used),
-            space=param_grid,
-            algo=rand.suggest,
-            rstate=np.random.default_rng(int(y[:].sum()) % 10000),
-            early_stop_fn=stop,
-            trials=trials,
-            catch_eval_exceptions=True,
-            verbose=True,
-            # The seed is deterministic but varies for each dataset and each split of it
-            max_evals=1000)
-        best_score = np.min([t['result']['loss'] for t in trials.trials])
-        if best_score < default:
-            best = space_eval(param_grid, best)
+        used_time = 0
+        for stop_time in max_time:
+            time_budget = stop_time - used_time
+            if time_budget <= 0:
+                continue
+
+            start_time = time.time()
+            def stop(trial, count=0):
+                count += 1
+                return (count + 1)/count * (time.time() - start_time) > time_budget, [count]
+
+            best = fmin(
+                fn=lambda params: eval_f(params, model_, x, y, metric_used),
+                space=param_grid,
+                algo=rand.suggest,
+                #rstate=np.random.default_rng(int(y[:].sum() + stop_time) % 10000),
+                early_stop_fn=stop,
+                trials=trials,
+                catch_eval_exceptions=True,
+                verbose=True,
+                # The seed is deterministic but varies for each dataset and each split of it
+                max_evals=1000)
+            best_score = np.min([t['result']['loss'] for t in trials.trials])
+            used_time += time.time() - start_time
+
+            summary[stop_time] = {}
+            if best_score < default:
+                summary[stop_time]['hparams'] = space_eval(param_grid, best)
+            else:
+                summary[stop_time]['hparams'] = {}
+            summary[stop_time]['tune_time'] = used_time
+    else:
+        summary[stop_time]['hparams'] = no_tune.copy()
+
+    for stop_time in summary:
+        start = time.time()
+        model = model_(**summary[stop_time]['hparams'])
+        model.fit(x, y)
+        train_time = time.time() - start
+        start = time.time()
+        if is_classification(metric_used):
+            pred = model.predict_proba(test_x)
         else:
-            best = {}
-    else:
-        best = no_tune.copy()
+            pred = model.predict(test_x)
+        predict_time = time.time() - start
 
-    start = time.time()
-    model = model_(**best)
-    model.fit(x, y)
-    fit_time = time.time() - start
-    start = time.time()
-    if is_classification(metric_used):
-        pred = model.predict_proba(test_x)
-    else:
-        pred = model.predict(test_x)
-    inference_time = time.time() - start
+        summary[stop_time]['pred'] = pred
+        summary[stop_time]['train_time'] = train_time
+        summary[stop_time]['predict_time'] = predict_time
 
-    best = {'best': best}
-    best['fit_time'] = fit_time
-    best['inference_time'] = inference_time
-
-    return pred, best
+    return summary
