@@ -9,6 +9,7 @@ import numpy as np
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -56,7 +57,7 @@ class BaseModel:
         is necessary for the cross validation.
     """
 
-    # this list should be populated with "classification", "regression", and "binary" for each subclass if 
+    # this list should be populated with "classification" and "regression" for each subclass if 
     # the model is not implemented for these objective types
     objtype_not_implemented = []
 
@@ -74,7 +75,7 @@ class BaseModel:
         # Create a placeholder for the predictions on the test dataset
         self.predictions = None
         self.prediction_probabilities = (
-            None  # Only used by binary / multi-class-classification
+            None  # Only used by classification
         )
 
     # added for TabZilla bookkeeping
@@ -159,7 +160,7 @@ class BaseModel:
 
     def predict(self, X: np.ndarray) -> tp.Tuple[np.ndarray, np.ndarray]:
         """
-        Returns the regression value or the concrete classes of binary / multi-class-classification tasks.
+        Returns the regression value or the concrete classes of classification tasks.
         (Save predictions to self.predictions)
 
         :param X: test data
@@ -179,7 +180,7 @@ class BaseModel:
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         """
-        Only implemented for binary / multi-class-classification tasks.
+        Only implemented for classification tasks.
         Returns the probability distribution over the classes C.
         (Save probabilities to self.prediction_probabilities)
 
@@ -188,12 +189,6 @@ class BaseModel:
         """
 
         self.prediction_probabilities = self.model.predict_proba(X)
-
-        # If binary task returns only probability for the true class, adapt it to return (N x 2)
-        if self.prediction_probabilities.shape[1] == 1:
-            self.prediction_probabilities = np.concatenate(
-                (1 - self.prediction_probabilities, self.prediction_probabilities), 1
-            )
         return self.prediction_probabilities
 
     def clone(self):
@@ -306,6 +301,9 @@ class BaseModelTorch(BaseModel):
         X_val = torch.tensor(X_val).float()
         y_val = torch.tensor(y_val)
 
+        if self.is_classification is None:
+            self.is_classification = not torch.is_floating_point(y)
+
         if self.is_classification:
             loss_func = nn.CrossEntropyLoss()
         else:
@@ -334,13 +332,14 @@ class BaseModelTorch(BaseModel):
 
         start_time = time.time()
         for epoch in range(self.epochs):
+            self.model.train()
             for i, (batch_X, batch_y) in enumerate(train_loader):
 
                 out = self.forward(batch_X.to(self.device))
 
                 if not self.is_classification:
                     # out = out.squeeze()
-                    out = out.reshape((batch_X.shape[0], ))
+                    out = out.reshape((batch_y.shape[0], ))
 
                 loss = loss_func(out, batch_y.to(self.device))
                 loss_history.append(loss.item())
@@ -352,6 +351,7 @@ class BaseModelTorch(BaseModel):
             # Early Stopping
             val_loss = 0.0
             val_dim = 0
+            self.model.eval()
             for val_i, (batch_val_X, batch_val_y) in enumerate(val_loader):
                 out = self.forward(batch_val_X.to(self.device))
 
@@ -396,9 +396,8 @@ class BaseModelTorch(BaseModel):
     def predict(self, X):
         # tabzilla update: return prediction probabilities
         if self.is_classification:
-            self.predict_proba(X)
-            self.predictions = np.argmax(self.prediction_probabilities, axis=1)
-            probs = self.prediction_probabilities
+            probs = self.predict_proba(X)
+            self.predictions = np.argmax(probs, axis=1)
         else:
             self.predictions = self.predict_helper(X)
             probs = np.array([])
@@ -406,11 +405,8 @@ class BaseModelTorch(BaseModel):
         return self.predictions, probs
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        probas = self.predict_helper(X)
-
-        # If binary task returns only probability for the true class, adapt it to return (N x 2)
-        if probas.shape[1] == 1:
-            probas = np.concatenate((1 - probas, probas), 1)
+        logits = self.predict_helper(X)
+        probas = F.softmax(logits, dim=1)
 
         self.prediction_probabilities = probas
         return self.prediction_probabilities
