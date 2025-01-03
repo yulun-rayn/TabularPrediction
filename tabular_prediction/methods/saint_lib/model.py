@@ -1,6 +1,9 @@
 import time
+import typing as tp
 
 import numpy as np
+
+from sklearn.base import BaseEstimator
 
 import torch
 import torch.nn as nn
@@ -17,7 +20,13 @@ from .augmentations import embed_data_mask
 from tabular_prediction.methods.utils import BaseModelTorch
 
 
-class SAINT(BaseModelTorch):
+class SAINT(BaseModelTorch, BaseEstimator):
+    """Interface for SAINT model.
+    Notes
+    -----
+    Specify all the parameters that can be set at the class level in their ``__init__`` as explicit keyword
+    arguments (no ``*args`` or ``**kwargs``).
+    """
 
     # TabZilla: add default number of epochs.
     # default_epochs = 100  # from SAINT paper. this is equal to our max-epochs
@@ -25,20 +34,32 @@ class SAINT(BaseModelTorch):
     def __init__(self, n_features: int, cat_features: list = None, cat_dims: list = None,
                  dim: int = 64, depth: int = 3, heads: int = 4, dropout: float = 0.5,
                  is_classification: bool = None, n_classes: int = None,
-                 learning_rate: float = 3e-5, epochs: int = 100,
-                 batch_size: int = 64, val_batch_size: int = 512,
-                 **kwargs):
+                 use_gpu: bool = True, gpu_ids: tp.Union[list, int] = 0,
+                 data_parallel: bool = False, learning_rate: float = 1e-3,
+                 batch_size: int = 128, val_batch_size: int = 512,
+                 epochs: int = 50, early_stopping_rounds: int = 5,
+                 run_id: str = "", directory: str = None):
         super().__init__(
             is_classification=is_classification,
             n_classes=n_classes,
+            use_gpu=use_gpu,
+            gpu_ids=gpu_ids,
+            data_parallel=data_parallel,
             learning_rate=learning_rate,
-            epochs=epochs,
             batch_size=batch_size,
             val_batch_size=val_batch_size,
-            **kwargs
+            epochs=epochs,
+            early_stopping_rounds=early_stopping_rounds,
+            run_id=run_id,
+            directory=directory
         )
+        self.n_features = n_features
         self.cat_features = cat_features if cat_features is not None else []
-        d_out = self.n_classes if self.is_classification else 1
+        self.cat_dims = cat_dims
+        self.dim = dim
+        self.depth = depth
+        self.heads = heads
+        self.dropout = dropout
 
         if len(self.cat_features) > 0:
             num_features = [i for i in range(n_features) if not i in self.cat_features]
@@ -52,7 +73,7 @@ class SAINT(BaseModelTorch):
         dim = dim if n_features < 50 else 8
         self.batch_size = self.batch_size if n_features < 50 else 64
 
-        print("Using dim %d and batch size %d" % (dim, self.batch_size))
+        print("Using dim %d, depth %d and batch size %d" % (dim, depth, self.batch_size))
 
         self.model = SAINTModel(
             categories=tuple(cat_dims),
@@ -67,7 +88,7 @@ class SAINT(BaseModelTorch):
             cont_embeddings="MLP",
             attentiontype="colrow",
             final_mlp_style="sep",
-            y_dim=d_out,
+            y_dim=self.n_classes if self.is_classification else 1,
         )
 
         self.to_device()
@@ -77,17 +98,13 @@ class SAINT(BaseModelTorch):
             self.model.parameters(), lr=self.learning_rate
         )
 
-        X = torch.tensor(X).float()
-        y = torch.tensor(y)
         if X_val is None:
-            perm = torch.randperm(X.shape[0])
+            perm = np.random.permutation(X.shape[0])
             val_size = int(r_val * X.shape[0])
             X_val = X[perm[:val_size]]
             X = X[perm[val_size:]]
             y_val = y[perm[:val_size]]
             y = y[perm[val_size:]]
-        X_val = torch.tensor(X_val).float()
-        y_val = torch.tensor(y_val)
 
         if self.is_classification is None:
             self.is_classification = not torch.is_floating_point(y)
@@ -98,8 +115,6 @@ class SAINT(BaseModelTorch):
         else:
             task = 'regression'
             criterion = nn.MSELoss()
-            y = y.float()
-            y_val = y_val.float()
 
         # SAINT wants it like this...
         X = {"data": X, "mask": np.ones_like(X)}
@@ -136,6 +151,7 @@ class SAINT(BaseModelTorch):
                 x_categ, x_cont, y_gts, cat_mask, con_mask = data
 
                 x_categ, x_cont = x_categ.to(self.device), x_cont.to(self.device)
+                y_gts = y_gts.squeeze(-1).to(self.device)
                 cat_mask, con_mask = cat_mask.to(self.device), con_mask.to(self.device)
 
                 # We are converting the data to embeddings in the next step
@@ -171,9 +187,8 @@ class SAINT(BaseModelTorch):
                     x_categ, x_cont, y_gts, cat_mask, con_mask = data
 
                     x_categ, x_cont = x_categ.to(self.device), x_cont.to(self.device)
-                    cat_mask, con_mask = cat_mask.to(self.device), con_mask.to(
-                        self.device
-                    )
+                    y_gts = y_gts.squeeze(-1).to(self.device)
+                    cat_mask, con_mask = cat_mask.to(self.device), con_mask.to(self.device)
 
                     _, x_categ_enc, x_cont_enc = embed_data_mask(
                         x_categ, x_cont, cat_mask, con_mask, self.model
@@ -199,11 +214,11 @@ class SAINT(BaseModelTorch):
                 min_val_loss_idx = epoch
 
                 # Save the currently best model
-                self.save_model(filename_extension="best", directory=self.tmp_name)
+                self.save_model(filename_extension="best", directory=self.directory)
 
             if min_val_loss_idx + self.early_stopping_rounds < epoch:
                 print(
-                    "Validation loss has not improved for %d steps!"
+                    "Validation loss has not improved for %d epochs!"
                     % self.early_stopping_rounds
                 )
                 print("Early stopping applies.")
@@ -217,16 +232,16 @@ class SAINT(BaseModelTorch):
                 break
 
         # Load best model
-        self.load_model(filename_extension="best", directory=self.tmp_name)
+        self.load_model(filename_extension="best", directory=self.directory)
         return loss_history, val_loss_history
 
     def predict_helper(self, X):
         X = {"data": X, "mask": np.ones_like(X)}
         y = {"data": np.ones((X["data"].shape[0], 1))}
 
-        test_ds = DataSetCatCon(X, y, self.cat_features, self.args.objective)
+        test_ds = DataSetCatCon(X, y, self.cat_features)
         testloader = DataLoader(
-            test_ds, batch_size=self.args.val_batch_size, shuffle=False, num_workers=2
+            test_ds, batch_size=self.val_batch_size, shuffle=False, num_workers=2
         )
 
         self.model.eval()
@@ -257,14 +272,14 @@ class SAINT(BaseModelTorch):
         return array with the same shape as X.
         """
         global my_attention
-        self.load_model(filename_extension="best", directory=self.tmp_name)
+        self.load_model(filename_extension="best", directory=self.directory)
 
         X = {"data": X, "mask": np.ones_like(X)}
         y = {"data": np.ones((X["data"].shape[0], 1))}
 
-        test_ds = DataSetCatCon(X, y, self.cat_features, self.args.objective)
+        test_ds = DataSetCatCon(X, y, self.cat_features)
         testloader = DataLoader(
-            test_ds, batch_size=self.args.val_batch_size, shuffle=False, num_workers=2
+            test_ds, batch_size=self.val_batch_size, shuffle=False, num_workers=2
         )
 
         self.model.eval()

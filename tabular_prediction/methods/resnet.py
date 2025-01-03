@@ -15,8 +15,12 @@ param_grid = {
     # 'hidden_multiplier': hp.choice('hidden_multiplier', [1, 2, 4]),
     'learning_rate': hp.choice('learning_rate', [1e-4, 1e-3, 1e-2]),
     'batch_size': hp.choice('learning_rate', [64, 128, 256]),
-    'epochs': hp.choice('epochs', [50, 100]),
 }
+
+def eval_f(params, model_, x, y, metric_used, cv=None):
+    model = model_(**params)
+    _, val_loss_history = model.fit(x, y)
+    return np.nanmin(val_loss_history)
 
 def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None):
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
@@ -28,6 +32,6 @@ def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_tim
             n_classes=len(np.unique(y)), **params)
 
     start_time = time.time()
-    summary = eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune)
+    summary = eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune, eval_f=eval_f, run_default=False)
     end_time = time.time()
     return test_y, summary, end_time-start_time

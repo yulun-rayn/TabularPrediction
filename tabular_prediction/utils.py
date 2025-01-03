@@ -7,10 +7,9 @@ from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import cross_val_score
+from sklearn.metrics import get_scorer
 
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials , space_eval, rand
-
-CV = 5
 
 def is_classification(metric_used):
     if metric_used.__name__ in ["accuracy_metric", "cross_entropy_metric", "auc_metric", "balanced_accuracy_metric", "average_precision_metric"]:
@@ -73,22 +72,28 @@ def get_scoring_string(metric_used):
     else:
         raise Exception('No scoring string found for metric')
 
-def eval_f(params, model_, x, y, metric_used):
-    scores = cross_val_score(model_(**params), x, y, cv=CV, scoring=get_scoring_string(metric_used))
+def eval_f(params, model_, x, y, metric_used, cv=5):
+    scores = cross_val_score(model_(**params), x, y, cv=cv, scoring=get_scoring_string(metric_used))
     return -np.nanmean(scores)
 
-def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune):
+def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune,
+                    cv=5, eval_f=eval_f, run_default=True):
     if not isinstance(max_time, list):
         max_time = [max_time]
 
     if no_tune is None:
-        default = eval_f({}, model_, x, y, metric_used)
+        if run_default:
+            default = eval_f({}, model_, x, y, metric_used, cv=cv)
+
         summary = {}
         trials = Trials()
         used_time = 0
-        for stop_time in max_time:
+        for i, stop_time in enumerate(max_time):
             time_budget = stop_time - used_time
             if time_budget <= 0:
+                summary[stop_time] = {}
+                summary[stop_time]['hparams'] = summary[max_time[i-1]]['hparams']
+                summary[stop_time]['tune_time'] = summary[max_time[i-1]]['tune_time']
                 continue
 
             start_time = time.time()
@@ -97,7 +102,7 @@ def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_
                 return (count + 1)/count * (time.time() - start_time) > time_budget, [count]
 
             best = fmin(
-                fn=lambda params: eval_f(params, model_, x, y, metric_used),
+                fn=lambda params: eval_f(params, model_, x, y, metric_used, cv=cv),
                 space=param_grid,
                 algo=rand.suggest,
                 #rstate=np.random.default_rng(int(y[:].sum() + stop_time) % 10000),
@@ -107,11 +112,11 @@ def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_
                 verbose=True,
                 # The seed is deterministic but varies for each dataset and each split of it
                 max_evals=1000)
-            best_score = np.min([t['result']['loss'] for t in trials.trials])
+            best_loss = np.min([t['result']['loss'] for t in trials.trials])
             used_time += time.time() - start_time
 
             summary[stop_time] = {}
-            if best_score < default:
+            if (not run_default) or (best_loss < default):
                 summary[stop_time]['hparams'] = space_eval(param_grid, best)
             else:
                 summary[stop_time]['hparams'] = {}

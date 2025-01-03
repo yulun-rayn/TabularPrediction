@@ -6,6 +6,7 @@ import random
 import typing as tp
 
 import numpy as np
+from scipy.special import softmax
 
 import torch
 import torch.nn as nn
@@ -19,12 +20,12 @@ def get_output_path(dir_name, filename, file_type, output_path="output/", direct
 
     if directory:
         # For example: .../models
-        dir_path = dir_path + "/" + directory
+        dir_path = os.path.join(dir_path, directory)
 
     if not os.path.isdir(dir_path):
         os.makedirs(dir_path)
 
-    file_path = dir_path + "/" + filename
+    file_path = os.path.join(dir_path, filename)
 
     if extension is not None:
         file_path += "_" + str(extension)
@@ -40,6 +41,11 @@ class BaseModel:
     """Basic interface for all models.
 
     All implemented models should inherit from this base class to provide a common interface.
+
+    Notes
+    -----
+    Specify all the parameters that can be set at the class level in their ``__init__`` as explicit keyword
+    arguments (no ``*args`` or ``**kwargs``).
 
     Methods
     -------
@@ -240,12 +246,18 @@ class BaseModel:
 
 
 class BaseModelTorch(BaseModel):
-    def __init__(self, is_classification: bool, n_classes: int = None,
+    """Basic interface for Torch models.
+    Notes
+    -----
+    Specify all the parameters that can be set at the class level in their ``__init__`` as explicit keyword
+    arguments (no ``*args`` or ``**kwargs``).
+    """
+    def __init__(self, is_classification: bool = None, n_classes: int = None,
                  use_gpu: bool = True, gpu_ids: tp.Union[list, int] = 0,
                  data_parallel: bool = False, learning_rate: float = 1e-3,
-                 batch_size: int = 64, val_batch_size: int = 256,
+                 batch_size: int = 128, val_batch_size: int = 512,
                  epochs: int = 50, early_stopping_rounds: int = 5,
-                 run_id: str = None):
+                 run_id: str = "", directory: str = None):
         super().__init__(is_classification=is_classification, n_classes=n_classes)
         self.use_gpu = use_gpu
         self.gpu_ids = gpu_ids if isinstance(gpu_ids, list) else [gpu_ids]
@@ -260,7 +272,9 @@ class BaseModelTorch(BaseModel):
         self.device = self.get_device()
 
         # tabzilla: use a random string for temporary saving/loading of the model. pass this to load/save model functions
-        self.tmp_name = "tmp_" + ''.join(random.sample(string.ascii_uppercase + string.digits, k=12))
+        if directory is None:
+            directory = "tmp_" + ''.join(random.sample(string.ascii_uppercase + string.digits, k=12))
+        self.directory = directory
 
     def to_device(self):
         if self.data_parallel:
@@ -271,7 +285,7 @@ class BaseModelTorch(BaseModel):
 
     def get_device(self):
         if self.use_gpu and torch.cuda.is_available():
-            if self.args.data_parallel:
+            if self.data_parallel:
                 device = "cuda"
             else:
                 device = f"cuda:{str(self.gpu_ids[0])}"
@@ -372,11 +386,11 @@ class BaseModelTorch(BaseModel):
                 min_val_loss_idx = epoch
 
                 # Save the currently best model
-                self.save_model(filename_extension="best", directory=self.tmp_name)
+                self.save_model(filename_extension="best", directory=self.directory)
 
             if min_val_loss_idx + self.early_stopping_rounds < epoch:
                 print(
-                    "Validation loss has not improved for %d steps!"
+                    "Validation loss has not improved for %d epochs!"
                     % self.early_stopping_rounds
                 )
                 print("Early stopping applies.")
@@ -390,7 +404,7 @@ class BaseModelTorch(BaseModel):
                 break
 
         # Load best model
-        self.load_model(filename_extension="best", directory=self.tmp_name)
+        self.load_model(filename_extension="best", directory=self.directory)
         return loss_history, val_loss_history
 
     def predict(self, X):
@@ -406,7 +420,7 @@ class BaseModelTorch(BaseModel):
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         logits = self.predict_helper(X)
-        probas = F.softmax(logits, dim=1)
+        probas = softmax(logits, axis=1)
 
         self.prediction_probabilities = probas
         return self.prediction_probabilities
