@@ -34,21 +34,20 @@ class SAINT(BaseModelTorch, BaseEstimator):
     def __init__(self, n_features: int, cat_features: list = None, cat_dims: list = None,
                  dim: int = 64, depth: int = 3, heads: int = 4, dropout: float = 0.5,
                  is_classification: bool = None, n_classes: int = None,
-                 use_gpu: bool = True, gpu_ids: tp.Union[list, int] = 0,
-                 data_parallel: bool = False, learning_rate: float = 1e-3,
+                 gpu_id: tp.Union[list, int] = 0, data_parallel: bool = False,
+                 learning_rate: float = 1e-3, epochs: int = 50,
                  batch_size: int = 128, val_batch_size: int = 512,
-                 epochs: int = 50, early_stopping_rounds: int = 5,
-                 run_id: str = "", directory: str = None):
+                 early_stopping_rounds: int = 5, run_id: str = "",
+                 directory: str = None):
         super().__init__(
             is_classification=is_classification,
             n_classes=n_classes,
-            use_gpu=use_gpu,
-            gpu_ids=gpu_ids,
+            gpu_id=gpu_id,
             data_parallel=data_parallel,
             learning_rate=learning_rate,
+            epochs=epochs,
             batch_size=batch_size,
             val_batch_size=val_batch_size,
-            epochs=epochs,
             early_stopping_rounds=early_stopping_rounds,
             run_id=run_id,
             directory=directory

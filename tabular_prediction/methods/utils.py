@@ -253,14 +253,15 @@ class BaseModelTorch(BaseModel):
     arguments (no ``*args`` or ``**kwargs``).
     """
     def __init__(self, is_classification: bool = None, n_classes: int = None,
-                 use_gpu: bool = True, gpu_ids: tp.Union[list, int] = 0,
-                 data_parallel: bool = False, learning_rate: float = 1e-3,
+                 gpu_id: tp.Union[list, int] = 0, data_parallel: bool = False,
+                 learning_rate: float = 1e-3, epochs: int = 50,
                  batch_size: int = 128, val_batch_size: int = 512,
-                 epochs: int = 50, early_stopping_rounds: int = 5,
-                 run_id: str = "", directory: str = None):
+                 early_stopping_rounds: int = 5, run_id: str = "",
+                 directory: str = None):
         super().__init__(is_classification=is_classification, n_classes=n_classes)
-        self.use_gpu = use_gpu
-        self.gpu_ids = gpu_ids if isinstance(gpu_ids, list) else [gpu_ids]
+        if gpu_id is not None and not isinstance(gpu_id, list):
+            gpu_id = [gpu_id]
+        self.gpu_id = gpu_id
         self.data_parallel = data_parallel
         self.learning_rate = learning_rate
         self.batch_size = batch_size
@@ -272,23 +273,23 @@ class BaseModelTorch(BaseModel):
         self.device = self.get_device()
 
         # tabzilla: use a random string for temporary saving/loading of the model. pass this to load/save model functions
-        if directory is None:
+        if directory is None or directory == "":
             directory = "tmp_" + ''.join(random.sample(string.ascii_uppercase + string.digits, k=12))
         self.directory = directory
 
     def to_device(self):
         if self.data_parallel:
-            self.model = nn.DataParallel(self.model, device_ids=self.gpu_ids)
+            self.model = nn.DataParallel(self.model, device_ids=self.gpu_id)
 
         print("On Device:", self.device)
         self.model.to(self.device)
 
     def get_device(self):
-        if self.use_gpu and torch.cuda.is_available():
+        if self.gpu_id is not None and torch.cuda.is_available():
             if self.data_parallel:
                 device = "cuda"
             else:
-                device = f"cuda:{str(self.gpu_ids[0])}"
+                device = f"cuda:{str(self.gpu_id[0])}"
         else:
             device = "cpu"
 
@@ -303,8 +304,8 @@ class BaseModelTorch(BaseModel):
             self.model.parameters(), lr=self.learning_rate
         )
 
-        X = torch.tensor(X).float()
-        y = torch.tensor(y)
+        X = torch.as_tensor(X, dtype=torch.float)
+        y = torch.as_tensor(y)
         if X_val is None:
             perm = torch.randperm(X.shape[0])
             val_size = int(r_val * X.shape[0])
@@ -312,8 +313,8 @@ class BaseModelTorch(BaseModel):
             X = X[perm[val_size:]]
             y_val = y[perm[:val_size]]
             y = y[perm[val_size:]]
-        X_val = torch.tensor(X_val).float()
-        y_val = torch.tensor(y_val)
+        X_val = torch.as_tensor(X_val, dtype=torch.float)
+        y_val = torch.as_tensor(y_val)
 
         if self.is_classification is None:
             self.is_classification = not torch.is_floating_point(y)

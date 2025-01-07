@@ -73,11 +73,15 @@ def get_scoring_string(metric_used):
         raise Exception('No scoring string found for metric')
 
 def eval_f(params, model_, x, y, metric_used, cv=5):
+    if cv is False:
+        model = model_(**params)
+        _, val_loss_history = model.fit(x, y)
+        return np.nanmin(val_loss_history)
     scores = cross_val_score(model_(**params), x, y, cv=cv, scoring=get_scoring_string(metric_used))
     return -np.nanmean(scores)
 
 def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune,
-                    cv=5, eval_f=eval_f, run_default=True):
+                    sgd=False, cv=5, run_default=True):
     if not isinstance(max_time, list):
         max_time = [max_time]
 
@@ -100,6 +104,9 @@ def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_
             def stop(trial, count=0):
                 count += 1
                 return (count + 1)/count * (time.time() - start_time) > time_budget, [count]
+
+            if sgd:
+                param_grid = {**param_grid, "directory": hp.choice('directory', [str(stop_time)])}
 
             best = fmin(
                 fn=lambda params: eval_f(params, model_, x, y, metric_used, cv=cv),
@@ -127,7 +134,10 @@ def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_
     for stop_time in summary:
         start = time.time()
         model = model_(**summary[stop_time]['hparams'])
-        model.fit(x, y)
+        if sgd:
+            model.load_model(filename_extension="best", directory=str(stop_time))
+        else:
+            model.fit(x, y)
         train_time = time.time() - start
         start = time.time()
         if is_classification(metric_used):
