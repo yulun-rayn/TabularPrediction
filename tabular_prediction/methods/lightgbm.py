@@ -38,7 +38,7 @@ def lightgbm_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_t
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=False, impute=False, standardize=False, cat_features=cat_features)
 
-    # Negative values in categorical features must be converted to positive
+    # Negative values in categorical features must be converted to non-negative
     cat_features_min = np.concatenate((x, test_x), axis=0)[:, cat_features].min(0)
     x[:, cat_features] = x[:, cat_features] - cat_features_min
     test_x[:, cat_features] = test_x[:, cat_features] - cat_features_min

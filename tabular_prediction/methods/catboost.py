@@ -40,7 +40,9 @@ def catboost_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_t
     )
 
     if gpu_id is not None:
-        gpu_params = {'task_type':"GPU", 'devices':gpu_id}
+        gpu_params = {'task_type':"GPU"
+                    #   , 'devices':gpu_id
+                      }
     else:
         gpu_params = {}
 

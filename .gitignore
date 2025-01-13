@@ -4,6 +4,8 @@
 *.csv
 **/AutogluonModels/
 **/catboost_info/
+*.arff
+*.tar.gz
 
 
 # Byte-compiled / optimized / DLL files

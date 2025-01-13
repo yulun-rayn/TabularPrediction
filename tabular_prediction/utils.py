@@ -7,10 +7,15 @@ from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import cross_val_score
+from sklearn.metrics import get_scorer
 
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials , space_eval, rand
 
 CV = 5
+
+class ColumnMissingError(Exception):
+    pass
+
 
 def is_classification(metric_used):
     if metric_used.__name__ in ["accuracy_metric", "cross_entropy_metric", "auc_metric", "balanced_accuracy_metric", "average_precision_metric"]:
@@ -20,6 +25,8 @@ def is_classification(metric_used):
 def make_pd_from_np(x, cat_features=[]):
     data = pd.DataFrame(x)
     for c in cat_features:
+        if c not in data.columns:
+            raise ColumnMissingError(f"Could not find column {c}, {type(c)} in {data.dtypes}")
         data.iloc[:, c] = data.iloc[:, c].astype('int')
     return data
 
@@ -34,13 +41,16 @@ def preprocess_impute(x, y, test_x, test_y, impute, one_hot, standardize, cat_fe
     cat_features = cat_features.tolist() if cat_features is not None else []
 
     if impute:
-        imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean')
+        # imputer drops columns that are completely empty by default, and that ruins the mapping between the cat_features and the columns in the data matrices
+        imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean', keep_empty_features=True)
         imp_mean.fit(x)
+        prev_shape = x.shape
         x, test_x = imp_mean.transform(x), imp_mean.transform(test_x)
+        assert prev_shape == x.shape
 
     if one_hot:
         x, test_x = make_pd_from_np(x, cat_features=cat_features),  make_pd_from_np(test_x, cat_features=cat_features)
-        transformer = ColumnTransformer(transformers=[('cat', OneHotEncoder(handle_unknown='ignore', sparse=False), cat_features)], remainder="passthrough")
+        transformer = ColumnTransformer(transformers=[('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), cat_features)], remainder="passthrough")
         transformer.fit(x)
         x, test_x = transformer.transform(x), transformer.transform(test_x)
 
@@ -73,22 +83,37 @@ def get_scoring_string(metric_used):
     else:
         raise Exception('No scoring string found for metric')
 
-def eval_f(params, model_, x, y, metric_used):
-    scores = cross_val_score(model_(**params), x, y, cv=CV, scoring=get_scoring_string(metric_used))
+def eval_f(params, model_, x, y, metric_used, cv=5):
+    if cv is False:
+        model = model_(**params)
+        _, val_loss_history = model.fit(x, y)
+        return np.nanmin(val_loss_history)
+    scores = cross_val_score(model_(**params), x, y, cv=cv, scoring=get_scoring_string(metric_used))
     return -np.nanmean(scores)
 
-def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune):
+def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune,
+                    sgd=False, cv=5, run_default=True):
     if not isinstance(max_time, list):
         max_time = [max_time]
 
     if no_tune is None:
-        default = eval_f({}, model_, x, y, metric_used)
+        if run_default:
+            default = eval_f({}, model_, x, y, metric_used, cv=cv)
+
         summary = {}
         trials = Trials()
         used_time = 0
-        for stop_time in max_time:
+        for i, stop_time in enumerate(max_time):
             time_budget = stop_time - used_time
             if time_budget <= 0:
+                summary[stop_time] = {}
+                summary[stop_time]['hparams'] = summary[max_time[i-1]]['hparams']
+                summary[stop_time]['tune_time'] = summary[max_time[i-1]]['tune_time']
+                if sgd:
+                    print(summary[max_time[i-1]]['hparams'])
+                    model = model_(**summary[max_time[i-1]]['hparams'])
+                    model.load_model(filename_extension="best", directory=str(max_time[i-1]))
+                    model.save_model(filename_extension="best", directory=str(stop_time))
                 continue
 
             start_time = time.time()
@@ -96,8 +121,11 @@ def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_
                 count += 1
                 return (count + 1)/count * (time.time() - start_time) > time_budget, [count]
 
+            if sgd:
+                param_grid = {**param_grid, "directory": hp.choice('directory', [str(stop_time)])}
+
             best = fmin(
-                fn=lambda params: eval_f(params, model_, x, y, metric_used),
+                fn=lambda params: eval_f(params, model_, x, y, metric_used, cv=cv),
                 space=param_grid,
                 algo=rand.suggest,
                 #rstate=np.random.default_rng(int(y[:].sum() + stop_time) % 10000),
@@ -107,11 +135,11 @@ def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_
                 verbose=True,
                 # The seed is deterministic but varies for each dataset and each split of it
                 max_evals=1000)
-            best_score = np.min([t['result']['loss'] for t in trials.trials])
+            best_loss = np.min([t['result']['loss'] for t in trials.trials])
             used_time += time.time() - start_time
 
             summary[stop_time] = {}
-            if best_score < default:
+            if (not run_default) or (best_loss < default):
                 summary[stop_time]['hparams'] = space_eval(param_grid, best)
             else:
                 summary[stop_time]['hparams'] = {}
@@ -122,7 +150,10 @@ def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_
     for stop_time in summary:
         start = time.time()
         model = model_(**summary[stop_time]['hparams'])
-        model.fit(x, y)
+        if sgd:
+            model.load_model(filename_extension="best", directory=str(stop_time))
+        else:
+            model.fit(x, y)
         train_time = time.time() - start
         start = time.time()
         if is_classification(metric_used):
