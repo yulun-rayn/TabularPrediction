@@ -9,4 +9,5 @@ xgboost
 catboost
 lightgbm
 rtdl
+func-timeout
 c1-envfuncs ### REMOVE!!!

@@ -1,5 +1,5 @@
 import os
-
+import func_timeout
 assert os.getenv("OpenML_API_KEY") or os.getenv("OPENML_API_KEY"), "OpenML_API_KEY or OPENML_API_KEY needs to be defined in order for openML API to work!"
 
 import math
@@ -47,11 +47,16 @@ def download_openml_suite(suite_id=99, max_features=500, shuffle=True,
             continue
         did = entry['did']
         print('Downloading', name, did, '..')
-
-        dataset = openml.datasets.get_dataset(int(did), download_qualities=True, download_features_meta_data=True)
+        
+        # get the raw arff files:
+        data_file_location = os.path.abspath(os.path.join(".", dataset.url.split("/")[-1]))
+        
+        # skip if the arff file is already present:
+        if not os.path.exists(data_file_location):
+            dataset = openml.datasets.get_dataset(int(did), download_qualities=True, download_features_meta_data=True)
         
         # el hack! use a local arff file, instead of the hosted arff at the url:
-        dataset.data_file = os.path.abspath(os.path.join(".", dataset.url.split("/")[-1]))
+        dataset.data_file = data_file_location
         dataset.parquet_file = None
 
         # print(dataset)
@@ -110,9 +115,14 @@ def download_openml_suite(suite_id=99, max_features=500, shuffle=True,
 
 
 def system_adaptable_download_openml_suite(seed=41):
+    print("Let the data download, begin!")
     try:
-        download_openml_suite(seed=seed)
+        # time-limited version of download_openml_suite(seed=seed):
+        max_wait_time = 10 # seconds
+        my_square = func_timeout.func_timeout(max_wait_time, download_openml_suite, args=[seed])
+        # except func_timeout.FunctionTimedOut:
     except Exception as e:  
+        print("Attempting to use proxy black magic to download data!")
         import envfuncs
         with envfuncs.proxy_context(select="authproxy"):
             download_openml_suite(seed=seed)
