@@ -121,7 +121,7 @@ def system_adaptable_download_openml_suite(seed=41):
         max_wait_time = 10 # seconds
         my_square = func_timeout.func_timeout(max_wait_time, download_openml_suite, args=[seed])
         # except func_timeout.FunctionTimedOut:
-    except Exception as e:  
+    except (func_timeout.FunctionTimedOut, Exception) as e:  
         print("Attempting to use proxy black magic to download data!")
         import envfuncs
         with envfuncs.proxy_context(select="authproxy"):
