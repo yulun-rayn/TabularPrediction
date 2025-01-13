@@ -1,6 +1,6 @@
 import os
 
-assert os.getenv("OpenML_API_KEY"), "OpenML_API_KEY needs to be defined in order for openML API to work!"
+assert os.getenv("OpenML_API_KEY") or os.getenv("OPENML_API_KEY"), "OpenML_API_KEY or OPENML_API_KEY needs to be defined in order for openML API to work!"
 
 import math
 import openml
@@ -9,8 +9,7 @@ import numpy as np
 import torch
 import requests
 
-openml.config.apikey = os.getenv("OpenML_API_KEY")
-
+openml.config.apikey = os.getenv("OpenML_API_KEY", default=os.getenv("OPENML_API_KEY"))
 
 def direct_download(url):
     filename = url.split("/")[-1]    
