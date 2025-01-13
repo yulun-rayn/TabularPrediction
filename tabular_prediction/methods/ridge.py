@@ -3,8 +3,6 @@ import math
 
 from hyperopt import hp
 
-from sklearn.linear_model import LogisticRegression, Ridge
-
 from tabular_prediction.utils import is_classification, preprocess_impute, eval_complete_f
 
 MULTITHREAD = -1
@@ -21,6 +19,8 @@ param_grid_reg = {
 }
 
 def ridge_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None):
+    from sklearn.linear_model import LogisticRegression, Ridge
+
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=True, impute=True, standardize=True, cat_features=cat_features)
 

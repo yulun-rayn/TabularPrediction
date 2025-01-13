@@ -3,8 +3,6 @@ import time
 import numpy as np
 import pandas as pd
 
-from autogluon.tabular import TabularPredictor
-
 from tabular_prediction.utils import is_classification, preprocess_impute
 
 def get_scoring_string(metric_used, multiclass=True):
@@ -33,6 +31,8 @@ def get_scoring_string(metric_used, multiclass=True):
         raise Exception('No scoring string found for metric')
 
 def autogluon_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300):
+    from autogluon.tabular import TabularPredictor
+
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=False, impute=False, standardize=False, cat_features=cat_features)
 

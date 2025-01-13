@@ -1,14 +1,12 @@
 import time
 
-from autosklearn.classification import AutoSklearnClassifier
-from autosklearn.regression import AutoSklearnRegressor
-from autosklearn.metrics import accuracy, log_loss, balanced_accuracy, average_precision, mean_squared_error, mean_absolute_error, r2
-
 from tabular_prediction.utils import is_classification, make_pd_from_np, preprocess_impute
 
 MULTITHREAD = -1
 
 def get_scoring_string(metric_used):
+    from autosklearn.metrics import accuracy, log_loss, balanced_accuracy, average_precision, mean_squared_error, mean_absolute_error, r2
+
     if metric_used.__name__ == "accuracy_metric":
         return accuracy
     elif metric_used.__name__ == "cross_entropy_metric":
@@ -27,6 +25,9 @@ def get_scoring_string(metric_used):
         raise Exception('No scoring string found for metric')
 
 def autosklearn_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300):
+    from autosklearn.classification import AutoSklearnClassifier
+    from autosklearn.regression import AutoSklearnRegressor
+
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=False, impute=False, standardize=False, cat_features=cat_features)
 
