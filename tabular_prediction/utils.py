@@ -33,7 +33,7 @@ def preprocess_impute(x, y, test_x, test_y, impute, one_hot, standardize, cat_fe
     cat_features = cat_features.tolist() if cat_features is not None else []
 
     if impute:
-        imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean')
+        imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean', keep_empty_features=True)
         imp_mean.fit(x)
         x, test_x = imp_mean.transform(x), imp_mean.transform(test_x)
 
