@@ -77,7 +77,8 @@ class TabResNet(BaseModelTorch, BaseEstimator):
 
         print("On Device:", self.device)
         self.model.to(self.device)
-        self.cat_tokenizer.to(self.device)
+        if len(self.cat_features) > 0:
+            self.cat_tokenizer.to(self.device)
 
     def forward(self, x):
         if len(self.cat_features) > 0:
