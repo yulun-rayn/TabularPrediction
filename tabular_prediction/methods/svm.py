@@ -1,5 +1,7 @@
 import time
 
+import numpy as np
+
 from hyperopt import hp
 
 from tabular_prediction.utils import is_classification, preprocess_impute, eval_complete_f
@@ -10,8 +12,13 @@ param_grid = {
     'kernel': hp.choice('kernel', ['rbf', 'poly', 'sigmoid'])
 }
 
-def svm_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None):
+def svm_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_train=5000, max_time=300, no_tune=None):
     from sklearn.svm import SVC, SVR
+
+    if x.shape[0] > max_train:
+        sample_ids = np.random.choice(x.shape[0], max_train, replace=False)
+        x = x[sample_ids]
+        y = y[sample_ids]
 
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=True, impute=True, standardize=True, cat_features=cat_features)
