@@ -109,9 +109,9 @@ def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_
                 summary[stop_time] = {}
                 summary[stop_time]['hparams'] = summary[max_time[i-1]]['hparams']
                 summary[stop_time]['tune_time'] = summary[max_time[i-1]]['tune_time']
+
                 if sgd:
-                    print(summary[max_time[i-1]]['hparams'])
-                    model = model_(**summary[max_time[i-1]]['hparams'])
+                    model = model_(**summary[stop_time]['hparams'])
                     model.load_model(filename_extension="best", directory=str(max_time[i-1]))
                     model.save_model(filename_extension="best", directory=str(stop_time))
                 continue

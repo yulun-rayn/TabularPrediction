@@ -4,8 +4,6 @@ import numpy as np
 
 from hyperopt import hp
 
-from .resnet_lib import TabResNet
-
 from tabular_prediction.utils import is_classification, preprocess_impute, eval_complete_f
 
 param_grid = {
@@ -19,6 +17,8 @@ param_grid = {
 }
 
 def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None, gpu_id=0, run_id=""):
+    from .resnet_lib import TabResNet
+
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=False, impute=False, standardize=False, cat_features=cat_features)
 

@@ -5,8 +5,6 @@ import numpy as np
 
 from hyperopt import hp
 
-from lightgbm import LGBMClassifier, LGBMRegressor
-
 from tabular_prediction.utils import is_classification, preprocess_impute, eval_complete_f
 
 param_grid = {
@@ -35,6 +33,8 @@ def get_scoring_string(metric_used, multiclass=True):
         raise Exception('No scoring string found for metric')
 
 def lightgbm_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None):
+    from lightgbm import LGBMClassifier, LGBMRegressor
+
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
         one_hot=False, impute=False, standardize=False, cat_features=cat_features)
 
