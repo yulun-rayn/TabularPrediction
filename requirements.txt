@@ -10,4 +10,4 @@ catboost==1.2.7
 lightgbm==4.5.0
 rtdl==0.0.13
 func-timeout==4.3.5
-# c1-envfuncs
+# c1-envfuncs ### only need this on C1 platforms

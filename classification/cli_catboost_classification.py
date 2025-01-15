@@ -34,15 +34,24 @@ def run_evaluation(split, gpu_id=0):
                 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('split', type=int, help='split number - must be 1 to 6')
-parser.add_argument('gpu', type=int, help='which gpu to use - 0, 1, ...')
+parser.add_argument('--split', type=int, help='split number - must be 1 to 6', default=1)
+parser.add_argument('--gpu', type=int, help='which gpu to use - 0, 1, ...', default=0)
+parser.add_argument('-m', '--multi_processing', action='store_true', help='whether to use python multiprocessing - this tries to spawn all splits from one python process')
 
 args = parser.parse_args()
 
-split = args.split
-assert split in range(1,7)
+if args.multi_processing:
+    print("Running with multiprocessing!")
+    with Pool(processes=6) as p:
+        print(p.map(run_evaluation, range(1, 7)))
+else:
+    split = args.split
+    assert split in range(1,7)
+    
+    print(f"Running with a single GPU! GPU={args.gpu}, split={split}")
 
-print(f"starting split {split}")
-run_evaluation(split=split, gpu_id=args.gpu)
-print(f"completed split {split}")
+    print(f"starting split {split}")
+    run_evaluation(split=split, gpu_id=args.gpu)
+    print(f"completed split {split}")
+
 
