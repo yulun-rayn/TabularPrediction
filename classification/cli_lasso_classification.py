@@ -19,6 +19,12 @@ def run_evaluation(split):
         for i, dataset in enumerate(datasets):
             data = torch.load(os.path.join(data_dir, dataset), map_location='cpu')
             x_train, y_train, x_test, y_test = data["data"]
+                        
+            # total_num_of_samples = (x_train.shape[0] + x_test.shape[0])
+            
+            # if total_num_of_samples > 625:
+            #     continue
+            
             cat_features = torch.where(data["cat_features"])[0].to(torch.int32)
 
             test_y, summary, _ = lasso_predict(x_train, y_train, x_test, y_test, cat_features=cat_features, metric_used=cross_entropy_metric, max_time=max_time)
