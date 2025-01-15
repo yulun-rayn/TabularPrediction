@@ -16,7 +16,7 @@ param_grid = {
     'epochs': hp.choice('epochs', [50, 100]),
 }
 
-def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None, gpu_id=0, save_dir="output/SAINT"):
+def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None, gpu_id=0, save_dir="output/SAINT", run_id=""):
     from .resnet_lib import TabResNet
 
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
@@ -35,6 +35,7 @@ def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_tim
             is_classification=is_classification(metric_used),
             n_classes=len(np.unique(y)),
             save_dir=save_dir,
+            run_id=run_id,
             gpu_id=gpu_id,
             **params
         )
