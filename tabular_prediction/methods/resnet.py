@@ -4,7 +4,7 @@ import numpy as np
 
 from hyperopt import hp
 
-from tabular_prediction.utils import is_classification, preprocess_impute, eval_complete_f
+from tabular_prediction.utils import is_classification, preprocess_impute, eval_complete_f_deep
 
 param_grid = {
     # 'd_token': hp.choice('d_token', [4, 8, 16]),
@@ -16,7 +16,7 @@ param_grid = {
     'epochs': hp.choice('epochs', [50, 100]),
 }
 
-def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None, gpu_id=0, run_id=""):
+def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None, gpu_id=0, save_dir="output/SAINT"):
     from .resnet_lib import TabResNet
 
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
@@ -34,13 +34,12 @@ def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_tim
             cat_dims=[len(np.unique(x[:, c])) for c in cat_features],
             is_classification=is_classification(metric_used),
             n_classes=len(np.unique(y)),
-            run_id=run_id,
+            save_dir=save_dir,
             gpu_id=gpu_id,
             **params
         )
 
     start_time = time.time()
-    summary = eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune,
-        sgd=True, cv=False, run_default=False)
+    summary = eval_complete_f_deep(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune)
     end_time = time.time()
     return test_y, summary, end_time-start_time

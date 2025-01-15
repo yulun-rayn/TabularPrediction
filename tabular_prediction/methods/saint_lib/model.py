@@ -11,8 +11,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from tabular_prediction.utils import is_classification
-
 from .models.pretrainmodel import SAINTModel
 from .data_openml import DataSetCatCon
 from .augmentations import embed_data_mask
@@ -38,7 +36,7 @@ class SAINT(BaseModelTorch, BaseEstimator):
                  learning_rate: float = 1e-3, epochs: int = 50,
                  batch_size: int = 128, val_batch_size: int = 512,
                  early_stopping_rounds: int = 5, run_id: str = "",
-                 directory: str = None):
+                 save_dir: str = None, sub_dir: str = None):
         super().__init__(
             is_classification=is_classification,
             n_classes=n_classes,
@@ -50,7 +48,8 @@ class SAINT(BaseModelTorch, BaseEstimator):
             val_batch_size=val_batch_size,
             early_stopping_rounds=early_stopping_rounds,
             run_id=run_id,
-            directory=directory
+            save_dir=save_dir,
+            sub_dir=sub_dir
         )
         self.n_features = n_features
         self.cat_features = cat_features if cat_features is not None else []
@@ -213,7 +212,7 @@ class SAINT(BaseModelTorch, BaseEstimator):
                 min_val_loss_idx = epoch
 
                 # Save the currently best model
-                self.save_model(filename_extension="best", directory=self.directory)
+                self.save_model(filename_extension="best")
 
             if min_val_loss_idx + self.early_stopping_rounds < epoch:
                 print(
@@ -231,7 +230,7 @@ class SAINT(BaseModelTorch, BaseEstimator):
                 break
 
         # Load best model
-        self.load_model(filename_extension="best", directory=self.directory)
+        self.load_model(filename_extension="best")
         return loss_history, val_loss_history
 
     def predict_helper(self, X):
@@ -271,7 +270,7 @@ class SAINT(BaseModelTorch, BaseEstimator):
         return array with the same shape as X.
         """
         global my_attention
-        self.load_model(filename_extension="best", directory=self.directory)
+        self.load_model(filename_extension="best")
 
         X = {"data": X, "mask": np.ones_like(X)}
         y = {"data": np.ones((X["data"].shape[0], 1))}

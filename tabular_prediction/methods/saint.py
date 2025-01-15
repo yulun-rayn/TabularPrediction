@@ -6,7 +6,7 @@ import torch
 
 from hyperopt import hp
 
-from tabular_prediction.utils import is_classification, preprocess_impute, eval_complete_f
+from tabular_prediction.utils import is_classification, preprocess_impute, eval_complete_f_deep
 
 param_grid = {
     'dim': hp.choice('dim', [32, 64, 128]), #,256
@@ -16,7 +16,7 @@ param_grid = {
     'epochs': hp.choice('epochs', [50, 100]),
 }
 
-def saint_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_features=100, max_time=300, no_tune=None, gpu_id=0, run_id=""):
+def saint_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_features=100, max_time=300, no_tune=None, gpu_id=0, save_dir="output/SAINT"):
     from .saint_lib import SAINT
 
     if x.shape[1] > max_features:
@@ -43,13 +43,12 @@ def saint_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_feat
             cat_dims=[len(np.unique(x[:, c])) for c in cat_features],
             is_classification=is_classification(metric_used),
             n_classes=len(np.unique(y)),
-            run_id=run_id,
+            save_dir=save_dir,
             gpu_id=gpu_id,
             **params
         )
 
     start_time = time.time()
-    summary = eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune,
-        sgd=True, cv=False, run_default=False)
+    summary = eval_complete_f_deep(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune)
     end_time = time.time()
     return test_y, summary, end_time-start_time
