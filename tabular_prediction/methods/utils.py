@@ -4,6 +4,7 @@ import time
 import string
 import random
 import typing as tp
+from datetime import datetime
 
 import numpy as np
 from scipy.special import softmax
@@ -14,10 +15,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
-def get_output_path(dir_name, filename, file_type, output_path="output/", directory=None, extension=None):
-    # For example: output/LinearModel/Covertype
-    dir_path = os.path.join(output_path, dir_name)
-
+def get_output_path(dir_path, filename, file_type, directory=None, extension=None):
     if directory:
         # For example: .../models
         dir_path = os.path.join(dir_path, directory)
@@ -257,7 +255,7 @@ class BaseModelTorch(BaseModel):
                  learning_rate: float = 1e-3, epochs: int = 50,
                  batch_size: int = 128, val_batch_size: int = 512,
                  early_stopping_rounds: int = 5, run_id: str = "",
-                 directory: str = None):
+                 save_dir: str = None, sub_dir: str = None):
         super().__init__(is_classification=is_classification, n_classes=n_classes)
         if gpu_id is not None and not isinstance(gpu_id, list):
             gpu_id = [gpu_id]
@@ -272,10 +270,12 @@ class BaseModelTorch(BaseModel):
 
         self.device = self.get_device()
 
-        # tabzilla: use a random string for temporary saving/loading of the model. pass this to load/save model functions
-        if directory is None or directory == "":
-            directory = "tmp_" + ''.join(random.sample(string.ascii_uppercase + string.digits, k=12))
-        self.directory = directory
+        if save_dir is None or save_dir == "":
+            save_dir = os.path.join("output/", self.__class__.__name__, run_id)
+        self.save_dir = save_dir
+        if sub_dir is None or sub_dir == "":
+            sub_dir = "tmp_" + datetime.now().strftime("%Y.%m.%d_%H:%M:%S")
+        self.sub_dir = sub_dir
 
     def to_device(self):
         if self.data_parallel:
@@ -387,7 +387,7 @@ class BaseModelTorch(BaseModel):
                 min_val_loss_idx = epoch
 
                 # Save the currently best model
-                self.save_model(filename_extension="best", directory=self.directory)
+                self.save_model(filename_extension="best")
 
             if min_val_loss_idx + self.early_stopping_rounds < epoch:
                 print(
@@ -405,7 +405,7 @@ class BaseModelTorch(BaseModel):
                 break
 
         # Load best model
-        self.load_model(filename_extension="best", directory=self.directory)
+        self.load_model(filename_extension="best")
         return loss_history, val_loss_history
 
     def predict(self, X):
@@ -445,25 +445,28 @@ class BaseModelTorch(BaseModel):
                 predictions.append(preds.detach().cpu().numpy())
         return np.concatenate(predictions)
 
-    def save_model(self, filename_extension="", directory="models"):
-        filename = get_output_path(
-            os.path.join(self.__class__.__name__, self.run_id),
-            directory=directory,
+    def save_model(self, filename_extension="", save_dir=None, sub_dir=None):
+        self.state_dict_path = get_output_path(
+            save_dir if save_dir is not None else self.save_dir,
+            directory=sub_dir if sub_dir is not None else self.sub_dir,
             filename="m",
             extension=filename_extension,
             file_type="pt",
         )
-        torch.save(self.model.state_dict(), filename)
+        torch.save(self.model.state_dict(), self.state_dict_path)
 
-    def load_model(self, filename_extension="", directory="models"):
-        filename = get_output_path(
-            os.path.join(self.__class__.__name__, self.run_id),
-            directory=directory,
-            filename="m",
-            extension=filename_extension,
-            file_type="pt",
-        )
-        state_dict = torch.load(filename)
+    def load_model(self, filename_extension=None, save_dir=None, sub_dir=None):
+        if filename_extension is None:
+            state_dict_path = self.state_dict_path
+        else:
+            state_dict_path = get_output_path(
+                save_dir if save_dir is not None else self.save_dir,
+                directory=sub_dir if sub_dir is not None else self.sub_dir,
+                filename="m",
+                extension=filename_extension,
+                file_type="pt",
+            )
+        state_dict = torch.load(state_dict_path)
         self.model.load_state_dict(state_dict)
 
     def get_model_size(self):

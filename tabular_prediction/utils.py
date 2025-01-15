@@ -3,6 +3,8 @@ import time
 import numpy as np
 import pandas as pd
 
+import torch
+
 from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -73,15 +75,10 @@ def get_scoring_string(metric_used):
         raise Exception('No scoring string found for metric')
 
 def eval_f(params, model_, x, y, metric_used, cv=5):
-    if cv is False:
-        model = model_(**params)
-        _, val_loss_history = model.fit(x, y)
-        return np.nanmin(val_loss_history)
     scores = cross_val_score(model_(**params), x, y, cv=cv, scoring=get_scoring_string(metric_used))
     return -np.nanmean(scores)
 
-def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune,
-                    sgd=False, cv=5, run_default=True):
+def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune, cv=5, run_default=True):
     if not isinstance(max_time, list):
         max_time = [max_time]
 
@@ -98,20 +95,12 @@ def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_
                 summary[stop_time] = {}
                 summary[stop_time]['hparams'] = summary[max_time[i-1]]['hparams']
                 summary[stop_time]['tune_time'] = summary[max_time[i-1]]['tune_time']
-
-                if sgd:
-                    model = model_(**summary[stop_time]['hparams'])
-                    model.load_model(filename_extension="best", directory=str(max_time[i-1]))
-                    model.save_model(filename_extension="best", directory=str(stop_time))
                 continue
 
             start_time = time.time()
             def stop(trial, count=0):
                 count += 1
                 return (count + 1)/count * (time.time() - start_time) > time_budget, [count]
-
-            if sgd:
-                param_grid = {**param_grid, "directory": hp.choice('directory', [str(stop_time)])}
 
             best = fmin(
                 fn=lambda params: eval_f(params, model_, x, y, metric_used, cv=cv),
@@ -139,10 +128,76 @@ def eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_
     for stop_time in summary:
         start = time.time()
         model = model_(**summary[stop_time]['hparams'])
-        if sgd:
-            model.load_model(filename_extension="best", directory=str(stop_time))
+        model.fit(x, y)
+        train_time = time.time() - start
+        start = time.time()
+        if is_classification(metric_used):
+            pred = model.predict_proba(test_x)
         else:
-            model.fit(x, y)
+            pred = model.predict(test_x)
+        predict_time = time.time() - start
+
+        summary[stop_time]['pred'] = pred
+        summary[stop_time]['train_time'] = train_time
+        summary[stop_time]['predict_time'] = predict_time
+
+    return summary
+
+def eval_f_deep(params, model_, x, y, metric_used):
+    model = model_(**params)
+    _, val_loss_history = model.fit(x, y)
+    return {"loss": np.nanmin(val_loss_history), "status": STATUS_OK, "model_path": model.state_dict_path}
+
+def eval_complete_f_deep(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune):
+    if not isinstance(max_time, list):
+        max_time = [max_time]
+
+    if no_tune is None:
+        summary = {}
+        trials = Trials()
+        used_time = 0
+        for i, stop_time in enumerate(max_time):
+            time_budget = stop_time - used_time
+            if time_budget <= 0:
+                summary[stop_time] = {}
+                summary[stop_time]['hparams'] = summary[max_time[i-1]]['hparams']
+                summary[stop_time]['tune_time'] = summary[max_time[i-1]]['tune_time']
+                summary[stop_time]['model_path'] = summary[max_time[i-1]]['model_path']
+                continue
+
+            start_time = time.time()
+            def stop(trial, count=0):
+                count += 1
+                return (count + 1)/count * (time.time() - start_time) > time_budget, [count]
+
+            best = fmin(
+                fn=lambda params: eval_f_deep(params, model_, x, y, metric_used),
+                space=param_grid,
+                algo=rand.suggest,
+                #rstate=np.random.default_rng(int(y[:].sum() + stop_time) % 10000),
+                early_stop_fn=stop,
+                trials=trials,
+                catch_eval_exceptions=True,
+                verbose=True,
+                # The seed is deterministic but varies for each dataset and each split of it
+                max_evals=1000)
+            best_idx = np.argmin([t['result']['loss'] for t in trials.trials])
+            best_path = trials.trials[best_idx]['result']['model_path']
+            used_time += time.time() - start_time
+
+            summary[stop_time] = {}
+            summary[stop_time]['hparams'] = space_eval(param_grid, best)
+            summary[stop_time]['tune_time'] = used_time
+            summary[stop_time]['model_path'] = best_path
+    else:
+        summary[stop_time]['hparams'] = no_tune.copy()
+
+    for stop_time in summary:
+        start = time.time()
+        model = model_(**summary[stop_time]['hparams'])
+        state_dict = torch.load(summary[stop_time]['model_path'])
+        model.model.load_state_dict(state_dict)
+
         train_time = time.time() - start
         start = time.time()
         if is_classification(metric_used):

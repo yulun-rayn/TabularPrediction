@@ -26,7 +26,7 @@ class TabResNet(BaseModelTorch, BaseEstimator):
                  learning_rate: float = 1e-3, epochs: int = 50,
                  batch_size: int = 128, val_batch_size: int = 512,
                  early_stopping_rounds: int = 5, run_id: str = "",
-                 directory: str = None):
+                 save_dir: str = None, sub_dir: str = None):
         super().__init__(
             is_classification=is_classification,
             n_classes=n_classes,
@@ -38,7 +38,8 @@ class TabResNet(BaseModelTorch, BaseEstimator):
             val_batch_size=val_batch_size,
             early_stopping_rounds=early_stopping_rounds,
             run_id=run_id,
-            directory=directory
+            save_dir=save_dir,
+            sub_dir=sub_dir
         )
         self.n_features = n_features
         self.cat_features = cat_features if cat_features is not None else []
