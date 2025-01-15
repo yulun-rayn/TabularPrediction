@@ -387,8 +387,9 @@ class BaseModelTorch(BaseModel):
                 min_val_loss_idx = epoch
 
                 # Save the currently best model
-                self.save_model(filename_extension="best")
-
+                self.save_model(filename_extension="best", directory=self.directory)
+                #self.save_model(filename_extension="best")
+                
             if min_val_loss_idx + self.early_stopping_rounds < epoch:
                 print(
                     "Validation loss has not improved for %d epochs!"
@@ -467,6 +468,7 @@ class BaseModelTorch(BaseModel):
                 file_type="pt",
             )
         state_dict = torch.load(state_dict_path)
+        assert len(state_dict.keys()) > 0, f"Error! state_dict we loaded had no keys: {state_dict}"
         self.model.load_state_dict(state_dict)
 
     def get_model_size(self):

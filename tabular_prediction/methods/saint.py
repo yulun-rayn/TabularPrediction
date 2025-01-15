@@ -16,7 +16,7 @@ param_grid = {
     'epochs': hp.choice('epochs', [50, 100]),
 }
 
-def saint_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_features=100, max_time=300, no_tune=None, gpu_id=0, save_dir="output/SAINT"):
+def saint_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_features=100, max_time=300, no_tune=None, gpu_id=0, save_dir="output/SAINT", run_id=""):
     from .saint_lib import SAINT
 
     if x.shape[1] > max_features:
@@ -44,6 +44,7 @@ def saint_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_feat
             is_classification=is_classification(metric_used),
             n_classes=len(np.unique(y)),
             save_dir=save_dir,
+            run_id=run_id,
             gpu_id=gpu_id,
             **params
         )

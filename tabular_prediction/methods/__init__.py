@@ -7,8 +7,8 @@ from .xgboost import xgboost_predict
 from .catboost import catboost_predict
 from .lightgbm import lightgbm_predict
 
-from .autogluon import autogluon_predict
-from .autosklearn import autosklearn_predict
+# from .autogluon import autogluon_predict
+# from .autosklearn import autosklearn_predict
 
 from .resnet import resnet_predict
 from .saint import saint_predict

@@ -13,6 +13,12 @@ from sklearn.metrics import get_scorer
 
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials , space_eval, rand
 
+CV = 5
+
+class ColumnMissingError(Exception):
+    pass
+
+
 def is_classification(metric_used):
     if metric_used.__name__ in ["accuracy_metric", "cross_entropy_metric", "auc_metric", "balanced_accuracy_metric", "average_precision_metric"]:
         return True
@@ -21,6 +27,8 @@ def is_classification(metric_used):
 def make_pd_from_np(x, cat_features=[]):
     data = pd.DataFrame(x)
     for c in cat_features:
+        if c not in data.columns:
+            raise ColumnMissingError(f"Could not find column {c}, {type(c)} in {data.dtypes}")
         data.iloc[:, c] = data.iloc[:, c].astype('int')
     return data
 
@@ -35,13 +43,16 @@ def preprocess_impute(x, y, test_x, test_y, impute, one_hot, standardize, cat_fe
     cat_features = cat_features.tolist() if cat_features is not None else []
 
     if impute:
+        # imputer drops columns that are completely empty by default, and that ruins the mapping between the cat_features and the columns in the data matrices
         imp_mean = SimpleImputer(missing_values=np.nan, strategy='mean', keep_empty_features=True)
         imp_mean.fit(x)
+        prev_shape = x.shape
         x, test_x = imp_mean.transform(x), imp_mean.transform(test_x)
+        assert prev_shape == x.shape
 
     if one_hot:
         x, test_x = make_pd_from_np(x, cat_features=cat_features),  make_pd_from_np(test_x, cat_features=cat_features)
-        transformer = ColumnTransformer(transformers=[('cat', OneHotEncoder(handle_unknown='ignore', sparse=False), cat_features)], remainder="passthrough")
+        transformer = ColumnTransformer(transformers=[('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), cat_features)], remainder="passthrough")
         transformer.fit(x)
         x, test_x = transformer.transform(x), transformer.transform(test_x)
 
