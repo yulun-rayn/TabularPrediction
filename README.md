@@ -6,7 +6,7 @@ A repository hosting popular tabular prediction methods. Tuning is automatically
 
 ### 1. Create Conda Environment
 ```bash
-conda create -n tab_env python=3.8
+conda create -n tab_env python=3.9
 conda activate tab_env
 ```
 
