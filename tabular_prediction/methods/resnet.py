@@ -27,17 +27,6 @@ def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_tim
     x[:, cat_features] = x[:, cat_features] - cat_features_min
     test_x[:, cat_features] = test_x[:, cat_features] - cat_features_min
 
-    model = TabResNet(
-        n_features=x.shape[1],
-        cat_features=cat_features,
-        cat_dims=[len(np.unique(x[:, c])) for c in cat_features],
-        is_classification=is_classification(metric_used),
-        n_classes=len(np.unique(y)),
-        run_id=run_id,
-        gpu_id=gpu_id
-    )
-    model.fit(x, y)
-
     def model_(**params):
         return TabResNet(
             n_features=x.shape[1],
