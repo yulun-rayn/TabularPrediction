@@ -341,10 +341,10 @@ class BaseModelTorch(BaseModel):
 
         min_val_loss = float("inf")
         min_val_loss_idx = 0
+        self.save_model(filename_extension="best")
 
         loss_history = []
         val_loss_history = []
-
         start_time = time.time()
         for epoch in range(self.epochs):
             self.model.train()

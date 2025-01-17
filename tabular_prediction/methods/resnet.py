@@ -16,11 +16,11 @@ param_grid = {
     'epochs': hp.choice('epochs', [50, 100]),
 }
 
-def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None, gpu_id=0, save_dir="output/SAINT"):
+def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_time=300, no_tune=None, gpu_id=0, save_dir="output/TabResNet"):
     from .resnet_lib import TabResNet
 
     x, y, test_x, test_y, cat_features = preprocess_impute(x, y, test_x, test_y,
-        one_hot=False, impute=False, standardize=False, cat_features=cat_features)
+        one_hot=False, impute=True, standardize=False, cat_features=cat_features)
 
     # Negative values in categorical features must be converted to non-negative
     cat_features_min = np.concatenate((x, test_x), axis=0)[:, cat_features].min(0)
