@@ -20,7 +20,7 @@ param_grid = {
 
 def get_scoring_string(metric_used):
     if metric_used.__name__ == "cross_entropy_metric":
-        return 'Logloss'
+        return 'MultiClass'
     elif metric_used.__name__ == "rmse_metric":
         return 'RMSE'
     elif metric_used.__name__ == "mae_metric":
