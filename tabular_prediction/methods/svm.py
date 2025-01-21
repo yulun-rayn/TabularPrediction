@@ -8,7 +8,6 @@ from tabular_prediction.utils import is_classification, preprocess_impute, eval_
 
 param_grid = {
     'C': hp.choice('C', [0.1, 1, 10, 100]),
-    'gamma': hp.choice('gamma', ['auto', 'scale']),
     'kernel': hp.choice('kernel', ['rbf', 'poly', 'sigmoid'])
 }
 
@@ -25,9 +24,9 @@ def svm_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_train=
 
     def model_(**params):
         if is_classification(metric_used):
-            return SVC(probability=True, **params)
+            return SVC(probability=True, gamma="auto", **params)
         else:
-            return SVR(**params)
+            return SVR(gamma="auto", **params)
 
     start_time = time.time()
     summary = eval_complete_f(x, y, test_x, model_, param_grid, metric_used, max_time, no_tune)
