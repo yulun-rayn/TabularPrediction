@@ -27,11 +27,14 @@ def resnet_predict(x, y, test_x, test_y, metric_used, cat_features=None, max_tim
     x[:, cat_features] = x[:, cat_features] - cat_features_min
     test_x[:, cat_features] = test_x[:, cat_features] - cat_features_min
 
+    x_all = np.concatenate([x, test_x], axis=0)
+    cat_dims = [len(np.unique(x_all[:, c])) for c in cat_features]
+
     def model_(**params):
         return TabResNet(
             n_features=x.shape[1],
             cat_features=cat_features,
-            cat_dims=[len(np.unique(x[:, c])) for c in cat_features],
+            cat_dims=cat_dims,
             is_classification=is_classification(metric_used),
             n_classes=len(np.unique(y)),
             save_dir=save_dir,
